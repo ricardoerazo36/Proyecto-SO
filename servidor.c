@@ -1,30 +1,59 @@
+/**
+ * servidor.c
+ * Este programa actúa como servidor en una aplicación cliente-servidor.
+ * Recibe comandos del cliente, los ejecuta y envía la salida de vuelta.
+ * Solo se permiten comandos no interactivos.
+ * Autores: Ricardo Erazo, Juan Manuel Perea, Andrés Ramirez, Daniel Cárdenas. 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define PORT 8080
-#define BUFFER_SIZE 1024
+#define PORT 8080            // Puerto del servidor
+#define BUFFER_SIZE 1024     // Tamaño del buffer para comandos y respuestas
 
-// Ejecutar el comando recibido y capturar la salida
+// Validar si el comando es permitido (no interactivo)
+int is_command_allowed(const char *command) {
+    const char *allowed_commands[] = {
+        "ls", "pwd", "cat", "cp", "rm", "mkdir", "rmdir", "touch",
+        "df", "du", "who", "id", "uptime", "hostname", "uname", "date",
+        "echo", "head", "tail", "wc", "grep", "stat", "file", NULL
+    };
+
+    for (int i = 0; allowed_commands[i] != NULL; i++) {
+        if (strncmp(command, allowed_commands[i], strlen(allowed_commands[i])) == 0) {
+            return 1; // Comando permitido
+        }
+    }
+    return 0; // Comando no permitido
+}
+
+// Ejecutar el comando y capturar la salida
 void execute_command(char *command, char *response) {
-    FILE *fp = popen(command, "r");
+    if (!is_command_allowed(command)) {
+        strcpy(response, "Error: Comando no permitido.\n");
+        return;
+    }
+
+    FILE *fp = popen(command, "r");  // Ejecutar comando
     if (fp == NULL) {
         strcpy(response, "Error ejecutando comando\n");
         return;
     }
-    fread(response, 1, BUFFER_SIZE, fp);
+    fread(response, 1, BUFFER_SIZE, fp);  // Leer salida
     pclose(fp);
 }
 
 int main() {
-    int server_fd, new_socket;
-    struct sockaddr_in address;
+    int server_fd, new_socket;       // Descriptor del socket
+    struct sockaddr_in address;     // Dirección del servidor
     int opt = 1;
     socklen_t addrlen = sizeof(address);
-    char buffer[BUFFER_SIZE] = {0};
-    char response[BUFFER_SIZE] = {0};
+    char buffer[BUFFER_SIZE] = {0}; // Buffer para comandos
+    char response[BUFFER_SIZE] = {0}; // Buffer para respuestas
 
     // Crear socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -38,6 +67,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    // Configurar dirección del servidor
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
@@ -57,6 +87,7 @@ int main() {
     printf("Servidor escuchando en el puerto %d...\n", PORT);
 
     while (1) {
+        // Aceptar nueva conexión
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen)) < 0) {
             perror("Error al aceptar conexión");
             exit(EXIT_FAILURE);
@@ -81,16 +112,15 @@ int main() {
 
             printf("Comando recibido: %s\n", buffer);
 
-            // Crear un nuevo proceso para ejecutar el comando
+            // Crear proceso hijo para ejecutar comando
             pid_t pid = fork();
             if (pid < 0) {
                 perror("Error al crear proceso");
                 exit(EXIT_FAILURE);
             } else if (pid == 0) {
-                // Proceso hijo: ejecutar el comando y enviar la respuesta
-                execute_command(buffer, response);
-                send(new_socket, response, strlen(response), 0);
-                exit(0); // Termina el proceso hijo
+                execute_command(buffer, response);  // Ejecutar comando
+                send(new_socket, response, strlen(response), 0);  // Enviar salida
+                exit(0);  // Termina proceso hijo
             }
         }
 
