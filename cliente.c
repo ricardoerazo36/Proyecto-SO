@@ -11,8 +11,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define PORT 8080            // Puerto del servidor
-#define BUFFER_SIZE 1024     // Tamaño del buffer para comandos y respuestas
+#define PORT 8080            
+#define BUFFER_SIZE 1024     
 
 int main() {
     int sock = 0;                     // Descriptor del socket
