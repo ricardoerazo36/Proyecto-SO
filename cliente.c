@@ -1,8 +1,8 @@
 /**
  * cliente.c
- * Este programa actúa como cliente en una aplicación cliente-servidor.
- * Envia comandos al servidor y muestra las respuestas en pantalla.
- * Autores: Ricardo Erazo, Juan Manuel Perea, Andrés Ramirez, Daniel Cárdenas. 
+ * Cliente para una aplicación cliente-servidor.
+ * Envía comandos al servidor y muestra las respuestas en pantalla.
+ * Autores: Ricardo Erazo, Juan Manuel Perea, Andrés Ramirez, Daniel Cárdenas.
  */
 
 #include <stdio.h>
@@ -15,63 +15,80 @@
 #define BUFFER_SIZE 1024     
 
 int main() {
-    int sock = 0;                     // Descriptor del socket
-    struct sockaddr_in serv_addr;     // Estructura para la dirección del servidor
-    char buffer[BUFFER_SIZE] = {0};   // Buffer para recibir respuestas
-    char command[BUFFER_SIZE] = {0};  // Buffer para enviar comandos
+    int sock = 0;
+    struct sockaddr_in serv_addr;
+    char buffer[BUFFER_SIZE] = {0};
+    char command[BUFFER_SIZE] = {0};
 
     // Crear socket
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Error al crear socket");
-        return -1;
+        return EXIT_FAILURE;
     }
 
-    // Configurar la dirección del servidor
+    // Configurar dirección del servidor
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(PORT);
 
-    // Convertir dirección IP a formato binario
     if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
-        perror("Dirección inválida");
-        return -1;
+        perror("Dirección IP inválida o no soportada");
+        close(sock);
+        return EXIT_FAILURE;
     }
 
     // Conectar al servidor
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("Error al conectar al servidor");
-        return -1;
+        close(sock);
+        return EXIT_FAILURE;
     }
 
     printf("Conectado al servidor.\n");
 
-    // Bucle para leer comandos y enviar al servidor
+    // Bucle principal
     while (1) {
         printf("Ingrese comando (o 'salida' para terminar): ");
-        fgets(command, BUFFER_SIZE, stdin);  // Leer comando del usuario
+        if (fgets(command, BUFFER_SIZE, stdin) == NULL) {
+            perror("Error al leer el comando");
+            continue;
+        }
 
-        // Detectar si el usuario desea salir
-        if (strcmp(command, "salida\n") == 0) {
-            send(sock, command, strlen(command), 0);
+        // Eliminar el salto de línea al final del comando
+        size_t len = strlen(command);
+        if (command[len - 1] == '\n') {
+            command[len - 1] = '\0';
+        }
+
+        // Comando de salida
+        if (strcmp(command, "salida") == 0) {
+            if (send(sock, command, strlen(command), 0) < 0) {
+                perror("Error al enviar comando de salida");
+            }
             printf("Cerrando conexión...\n");
             break;
         }
 
-        // Crear proceso hijo para enviar comando
-        pid_t pid = fork();
-        if (pid < 0) {
-            perror("Error al crear proceso");
-            exit(EXIT_FAILURE);
-        } else if (pid == 0) {
-            send(sock, command, strlen(command), 0);  // Enviar comando al servidor
-            exit(0);
+        // Enviar comando al servidor
+        if (send(sock, command, strlen(command), 0) < 0) {
+            perror("Error al enviar el comando");
+            continue;
         }
 
         // Leer respuesta del servidor
-        read(sock, buffer, BUFFER_SIZE);
+        ssize_t bytes_read = read(sock, buffer, BUFFER_SIZE - 1);
+        if (bytes_read < 0) {
+            perror("Error al leer la respuesta del servidor");
+            continue;
+        }
+
+        buffer[bytes_read] = '\0'; // Asegurar fin de cadena
         printf("Respuesta del servidor:\n%s\n", buffer);
-        memset(buffer, 0, BUFFER_SIZE);  // Limpiar buffer
+
+        // Limpiar buffers
+        memset(buffer, 0, BUFFER_SIZE);
+        memset(command, 0, BUFFER_SIZE);
     }
 
-    close(sock);  // Cerrar conexión
-    return 0;
+    close(sock);
+    return EXIT_SUCCESS;
 }
