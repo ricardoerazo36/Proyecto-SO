@@ -47,6 +47,22 @@ void execute_command(const char *command, char *response) {
     size_t bytes_read = fread(response, 1, BUFFER_SIZE - 1, fp); // Leer salida
     response[bytes_read] = '\0'; // Asegurar fin de cadena
     pclose(fp);
+
+    if (bytes_read == 0) {
+        if (strncmp(command, "rm ", 3) == 0) {
+            snprintf(response, BUFFER_SIZE, "Comando ejecutado con éxito. Se eliminó el archivo %s.\n", command + 3);
+        } else if (strncmp(command, "cp ", 3) == 0) {
+            snprintf(response, BUFFER_SIZE, "Comando ejecutado con éxito. Se copió el archivo %s.\n", command + 3);
+        } else if (strncmp(command, "mkdir ", 6) == 0) {
+            snprintf(response, BUFFER_SIZE, "Comando ejecutado con éxito. Se creó el directorio %s.\n", command + 6);
+        } else if (strncmp(command, "rmdir ", 6) == 0) {
+            snprintf(response, BUFFER_SIZE, "Comando ejecutado con éxito. Se eliminó el directorio %s.\n", command + 6);
+        } else if (strncmp(command, "touch ", 6) == 0) {
+            snprintf(response, BUFFER_SIZE, "Comando ejecutado con éxito. Se creó el archivo %s.\n", command + 6);
+        } else {
+            strcpy(response, "Comando ejecutado con éxito, sin salida.\n");
+        }
+    }
 }
 
 int main() {
